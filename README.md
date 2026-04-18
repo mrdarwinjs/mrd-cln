@@ -1,4 +1,4 @@
-markdown_content = """# 🚀 Windows System Optimizer (v1.0.0)
+🚀 Windows System Optimizer (v1.0.0)
 
 Windows işletim sistemini temizlemek, hızlandırmak ve optimize etmek için Python ile geliştirilmiş hafif ve güçlü bir sistem düzenleyicidir. Gereksiz sistem yüklerini temizleyerek bilgisayarınızın performansını artırmayı hedefler.
 
