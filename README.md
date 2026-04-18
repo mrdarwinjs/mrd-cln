@@ -20,5 +20,5 @@ Windows işletim sistemini temizlemek, hızlandırmak ve optimize etmek için Py
 
 1. Projeyi bilgisayarınıza indirin:
    ```bash
-   git clone [https://github.com/kullaniciadi/windows-optimizer.git](https://github.com/kullaniciadi/windows-optimizer.git)
-   cd windows-optimizer
+   git clone [https://github.com/mrdarwinjs/mrd-cln.git](https://github.com/mrdarwinjs/mrd-cln.git)
+   cd mrd-cln
