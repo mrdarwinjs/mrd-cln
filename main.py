@@ -5,6 +5,7 @@ import subprocess
 import ctypes
 import threading
 import sys
+import json
 
 # --- PRELOAD / PERFORMANS AYARI ---
 try:
@@ -22,6 +23,41 @@ except ImportError as e:
     sys.exit(1)
 
 console = Console()
+CONFIG_FILE = "cleaner_config.json"
+
+# Windows'ta CMD penceresinin anlık açılıp kapanmasını engellemek için
+CREATE_NO_WINDOW = 0x08000000 if os.name == 'nt' else 0
+
+# --- TEMA SİSTEMİ ---
+THEMES = {
+    "Sistem Varsayılanı": {"mode": "System", "color": "blue"},
+    "Gece Mavisi": {"mode": "Dark", "color": "blue"},
+    "Orman Yeşili": {"mode": "Dark", "color": "green"},
+    "Siberpunk": {"mode": "Dark", "color": "dark-blue"},
+    "Aydınlık Mavi": {"mode": "Light", "color": "blue"}
+}
+
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"theme": "Sistem Varsayılanı"}
+
+def save_config(theme_name):
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump({"theme": theme_name}, f, indent=4)
+
+# Uygulama başlamadan önce temayı yükle
+current_config = load_config()
+selected_theme = current_config.get("theme", "Sistem Varsayılanı")
+if selected_theme not in THEMES:
+    selected_theme = "Sistem Varsayılanı"
+
+ctk.set_appearance_mode(THEMES[selected_theme]["mode"])
+ctk.set_default_color_theme(THEMES[selected_theme]["color"])
 
 # --- YARDIMCI FONKSİYONLAR ---
 def is_admin():
@@ -31,14 +67,12 @@ def is_admin():
         return False
 
 def get_size_format(b, factor=1024, suffix="B"):
-    """Bayt cinsinden boyutu okunabilir formata çevirir (MB, GB vb.)"""
     for unit in ["", "K", "M", "G", "T", "P", "E", "Z"]:
-        if b < factor:
-            return f"{b:.2f} {unit}{suffix}"
+        if b < factor: return f"{b:.2f} {unit}{suffix}"
         b /= factor
     return f"{b:.2f} Y{suffix}"
 
-# --- ÇEKİRDEK MANTIK (CORE LOGIC) ---
+# --- ÇEKİRDEK MANTIK ---
 class CleaningCore:
     def __init__(self):
         self.targets = {
@@ -48,18 +82,11 @@ class CleaningCore:
         }
 
     def scan_system(self):
-        """Aktif hedefleri tarar, dosya listesini ve toplam boyutu döndürür."""
-        files_to_clean = []
-        total_size = 0
-
+        files_to_clean, total_size = [], 0
         for name, data in self.targets.items():
-            if not data["active"]:
-                continue
-            
+            if not data["active"]: continue
             folder = data["path"]
-            if not os.path.exists(folder):
-                continue
-                
+            if not os.path.exists(folder): continue
             try:
                 for item in os.listdir(folder):
                     item_path = os.path.join(folder, item)
@@ -71,48 +98,55 @@ class CleaningCore:
                             total_size += sum(os.path.getsize(os.path.join(dirpath, filename)) 
                                               for dirpath, _, filenames in os.walk(item_path) 
                                               for filename in filenames)
-                    except Exception:
-                        pass
-            except PermissionError:
-                pass # Yönetici izni yoksa atla
-                
+                    except Exception: pass
+            except PermissionError: pass
         return files_to_clean, total_size
 
     @staticmethod
     def run_defrag_logic():
         try:
-            subprocess.run(["dfrgui.exe"], check=True)
+            subprocess.run(["dfrgui.exe"], check=True, creationflags=CREATE_NO_WINDOW)
             return "SUCCESS"
         except OSError as e:
-            if getattr(e, 'winerror', None) == 740:
-                return "ADMIN_REQUIRED"
+            if getattr(e, 'winerror', None) == 740: return "ADMIN_REQUIRED"
             return f"ERROR: {e}"
 
-# Global Core Instance
+    @staticmethod
+    def check_updates():
+        """Winget kullanarak Atlas OS'a uygun (sadece app/driver) güncellemeleri tarar."""
+        try:
+            result = subprocess.run(["winget", "upgrade"], capture_output=True, text=True, creationflags=CREATE_NO_WINDOW)
+            return result.stdout if result.stdout else "Güncellenecek paket bulunamadı veya Winget yüklü değil."
+        except Exception as e:
+            return f"Hata: {e}\n(Winget sisteminizde yüklü olmayabilir)"
+
+    @staticmethod
+    def install_updates():
+        """Tüm uygun uygulamaları günceller."""
+        try:
+            subprocess.run(["winget", "upgrade", "--all", "--accept-source-agreements", "--accept-package-agreements"], creationflags=CREATE_NO_WINDOW)
+            return True
+        except Exception:
+            return False
+
 core = CleaningCore()
 
 # --- GUI SINIFI ---
 class CleanerGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Windows Cleaner Pro")
-        self.geometry("650x550")
+        self.title("Windows Cleaner Pro - Atlas OS Edition")
+        self.geometry("750x600")
         self.resizable(False, False)
-        
-        ctk.set_appearance_mode("System")
-        ctk.set_default_color_theme("blue")
-
-        self._osName = "Windows"
-        self._programVersion = "1.0 (Pro GUI)"
         
         self.setup_ui()
 
     def setup_ui(self):
         # Sol Menü (Sidebar)
-        self.sidebar = ctk.CTkFrame(self, width=150, corner_radius=0)
+        self.sidebar = ctk.CTkFrame(self, width=160, corner_radius=0)
         self.sidebar.pack(side="left", fill="y")
         
-        self.logo_label = ctk.CTkLabel(self.sidebar, text="WinCleaner\nPRO", font=ctk.CTkFont(size=20, weight="bold"))
+        self.logo_label = ctk.CTkLabel(self.sidebar, text="WinCleaner\nPRO", font=ctk.CTkFont(size=22, weight="bold"))
         self.logo_label.pack(pady=20, padx=20)
         
         self.status_label = ctk.CTkLabel(self.sidebar, text=f"Admin: {'✅' if is_admin() else '❌'}", font=ctk.CTkFont(weight="bold"))
@@ -129,9 +163,16 @@ class CleanerGUI(ctk.CTk):
         self.tabview = ctk.CTkTabview(self.main_frame)
         self.tabview.pack(fill="both", expand=True)
         self.tab_clean = self.tabview.add("Temizlik")
+        self.tab_update = self.tabview.add("Güncellemeler")
+        self.tab_settings = self.tabview.add("Ayarlar")
         self.tab_logs = self.tabview.add("Loglar")
 
-        # --- Temizlik Sekmesi İçeriği ---
+        self.setup_clean_tab()
+        self.setup_update_tab()
+        self.setup_settings_tab()
+        self.setup_logs_tab()
+
+    def setup_clean_tab(self):
         self.lbl_targets = ctk.CTkLabel(self.tab_clean, text="Temizlenecek Alanları Seçin:", font=ctk.CTkFont(weight="bold"))
         self.lbl_targets.pack(anchor="w", pady=(10, 5), padx=10)
 
@@ -158,16 +199,52 @@ class CleanerGUI(ctk.CTk):
         self.progress_bar.pack(fill="x", pady=20, padx=20)
         self.progress_bar.set(0)
 
-        # --- Loglar Sekmesi İçeriği ---
+    def setup_update_tab(self):
+        info_text = ("⚡ ATLAS OS MODU AKTİF ⚡\n"
+                     "Sistem hizmetlerini bozmamak için Windows OS güncellemeleri atlanır.\n"
+                     "Sadece Uygulamalar, Paketler ve bağımsız Sürücüler aranır.")
+        self.lbl_update_info = ctk.CTkLabel(self.tab_update, text=info_text, font=ctk.CTkFont(weight="bold"), text_color="#E67E22")
+        self.lbl_update_info.pack(pady=(10, 10))
+
+        self.update_box = ctk.CTkTextbox(self.tab_update, height=200, font=ctk.CTkFont(family="Consolas", size=11))
+        self.update_box.pack(fill="both", expand=True, padx=10, pady=5)
+        self.update_box.insert("end", "Güncellemeleri görmek için 'Sistemi Tara' butonuna basın.\n")
+        self.update_box.configure(state="disabled")
+
+        self.btn_check_update = ctk.CTkButton(self.tab_update, text="Sistemi Tara (Winget)", command=self.start_update_scan)
+        self.btn_check_update.pack(side="left", fill="x", expand=True, padx=10, pady=10)
+
+        self.btn_install_update = ctk.CTkButton(self.tab_update, text="Tümünü Güncelle", fg_color="#2FA572", hover_color="#1E7A52", command=self.start_update_install)
+        self.btn_install_update.pack(side="right", fill="x", expand=True, padx=10, pady=10)
+
+    def setup_settings_tab(self):
+        self.lbl_theme = ctk.CTkLabel(self.tab_settings, text="Arayüz Teması Seçin:", font=ctk.CTkFont(weight="bold"))
+        self.lbl_theme.pack(anchor="w", pady=(20, 5), padx=20)
+
+        self.theme_var = ctk.StringVar(value=selected_theme)
+        self.theme_menu = ctk.CTkOptionMenu(self.tab_settings, values=list(THEMES.keys()), variable=self.theme_var, command=self.change_theme)
+        self.theme_menu.pack(anchor="w", padx=20, pady=5)
+
+        self.lbl_theme_info = ctk.CTkLabel(self.tab_settings, text="* Renk teması değişikliklerinin (örn: Mavi -> Yeşil)\ntam etkili olması için uygulamayı yeniden başlatın.", text_color="gray", justify="left")
+        self.lbl_theme_info.pack(anchor="w", padx=20, pady=10)
+
+    def setup_logs_tab(self):
         self.log_box = ctk.CTkTextbox(self.tab_logs, state="disabled")
         self.log_box.pack(fill="both", expand=True, padx=10, pady=10)
+        self.log("Sistem hazır. Modülleri seçip işleme başlayabilirsiniz.")
 
-        self.log("Sistem hazır. Modülleri seçip temizliğe başlayabilirsiniz.")
-
+    # --- İşlevler ---
     def update_targets(self):
         core.targets["User Temp"]["active"] = self.switch_user_temp.get() == 1
         core.targets["System Temp"]["active"] = self.switch_sys_temp.get() == 1
         core.targets["Prefetch"]["active"] = self.switch_prefetch.get() == 1
+
+    def change_theme(self, choice):
+        save_config(choice)
+        mode = THEMES[choice]["mode"]
+        ctk.set_appearance_mode(mode)
+        # Renk teması anında değişmez, restart ister ama aydınlık/karanlık anında değişir
+        self.log(f"Tema '{choice}' olarak kaydedildi. Uygulama bir sonraki açılışta bu renklerle başlayacak.")
 
     def log(self, message):
         def append_text():
@@ -180,13 +257,11 @@ class CleanerGUI(ctk.CTk):
     def analyze_system(self):
         self.log("Sistem analiz ediliyor...")
         self.btn_analyze.configure(state="disabled")
-        
         def task():
             files, size = core.scan_system()
             size_str = get_size_format(size)
             self.log(f"Analiz tamamlandı. Bulunan dosya: {len(files)}, Toplam Boyut: {size_str}")
             self.after(0, lambda: self.btn_analyze.configure(state="normal", text=f"Analiz Edildi: {size_str}"))
-        
         threading.Thread(target=task, daemon=True).start()
 
     def start_clean(self):
@@ -196,10 +271,9 @@ class CleanerGUI(ctk.CTk):
         threading.Thread(target=self._clean_task, daemon=True).start()
 
     def _clean_task(self):
-        self.log("--- Temizlik İşlemi Başlatıldı ---")
+        self.log("--- Temizlik Başlatıldı ---")
         files, total_size = core.scan_system()
-        total = len(files)
-        success, fail = 0, 0
+        total, success, fail = len(files), 0, 0
 
         for i, f_path in enumerate(files):
             try:
@@ -210,48 +284,57 @@ class CleanerGUI(ctk.CTk):
             if total > 0: self.after(0, lambda v=(i+1)/total: self.progress_bar.set(v))
         
         size_str = get_size_format(total_size if success > 0 else 0)
-        self.log(f"Temizlik Bitti! Silinen: {success}, Atlanan: {fail}")
-        self.log(f"Kazanılan Toplam Alan: {size_str}")
-        
+        self.log(f"Bitti! Silinen: {success}, Atlanan: {fail} | Kazanılan: {size_str}")
         self.after(0, lambda: self.freed_space_label.configure(text=f"Kazanılan Alan\n{size_str}"))
-        self.after(0, lambda: self.btn_clean.configure(state="normal"))
-        self.after(0, lambda: self.btn_analyze.configure(state="normal", text="Sistemi Analiz Et"))
-        self.after(0, lambda: self.progress_bar.set(0))
+        self.after(0, lambda: [self.btn_clean.configure(state="normal"), self.btn_analyze.configure(state="normal", text="Sistemi Analiz Et"), self.progress_bar.set(0)])
 
     def start_defrag(self):
         res = core.run_defrag_logic()
         if res == "ADMIN_REQUIRED":
-            cevap = messagebox.askyesno("Yetki Gerekli", "Disk birleştirici için yönetici izni gerekiyor. Verilsin mi?")
-            if cevap: ctypes.windll.shell32.ShellExecuteW(None, "runas", "dfrgui.exe", "", None, 1)
-        elif res == "SUCCESS": 
-            self.log("Defragmenter başlatıldı.")
+            if messagebox.askyesno("Yetki Gerekli", "Yönetici izni gerekiyor. Verilsin mi?"):
+                ctypes.windll.shell32.ShellExecuteW(None, "runas", "dfrgui.exe", "", None, 1)
+        elif res == "SUCCESS": self.log("Defragmenter başlatıldı.")
+
+    def start_update_scan(self):
+        self.btn_check_update.configure(state="disabled")
+        self.update_box.configure(state="normal")
+        self.update_box.delete("1.0", "end")
+        self.update_box.insert("end", "Güncellemeler taranıyor... Lütfen bekleyin...\n")
+        self.update_box.configure(state="disabled")
+        
+        def task():
+            output = core.check_updates()
+            self.after(0, lambda: self._update_scan_done(output))
+        threading.Thread(target=task, daemon=True).start()
+
+    def _update_scan_done(self, output):
+        self.update_box.configure(state="normal")
+        self.update_box.delete("1.0", "end")
+        self.update_box.insert("end", output)
+        self.update_box.configure(state="disabled")
+        self.btn_check_update.configure(state="normal")
+
+    def start_update_install(self):
+        cevap = messagebox.askyesno("Güncelleme", "Listelenen tüm uygulamalar arka planda güncellenecek. Onaylıyor musunuz?")
+        if not cevap: return
+        self.log("Uygulama/Sürücü güncellemeleri arka planda başlatıldı...")
+        threading.Thread(target=core.install_updates, daemon=True).start()
 
 # --- CLI MANTIK ---
 def draw_cli_menu():
     console.clear()
-    console.print(Text("\n ⚡ WINDOWS CLEANER PRO (CLI Mode) ⚡\n", style="bold bright_cyan justify center"))
+    console.print(Text("\n ⚡ WINDOWS CLEANER PRO (ATLAS OS Modu) ⚡\n", style="bold bright_cyan justify center"))
     
-    # Bilgi Tablosu
     info_table = Table(show_header=False, box=box.ROUNDED, border_style="dim")
-    info_table.add_row("İşletim Sistemi", "Windows")
-    info_table.add_row("Yönetici İzni", "[green]Aktif[/green]" if is_admin() else "[red]Yok (Sınırlı Temizlik)[/red]")
+    info_table.add_row("İşletim Sistemi", "[blue]Atlas OS (Optimize Windows)[/blue]")
+    info_table.add_row("Yönetici İzni", "[green]Aktif[/green]" if is_admin() else "[red]Yok (Sınırlı)[/red]")
+    info_table.add_row("Seçili Tema", f"[magenta]{current_config.get('theme', 'Varsayılan')}[/magenta]")
     console.print(info_table)
-
-    # Hedef Durum Tablosu
-    target_table = Table(title="Aktif Temizlik Hedefleri", box=box.SIMPLE_HEAD)
-    target_table.add_column("Bölge", style="cyan")
-    target_table.add_column("Durum", justify="center")
-    
-    for name, data in core.targets.items():
-        status = "[green]Açık[/green]" if data["active"] else "[red]Kapalı[/red]"
-        target_table.add_row(name, status)
-    
-    console.print(target_table)
     
     console.print(Panel(
-        "[1] Seçili Alanları Temizle\n"
-        "[2] Ayarları Değiştir (Aç/Kapat)\n"
-        "[3] Disk Defragmenter Başlat\n"
+        "[1] Sistemi Temizle\n"
+        "[2] Güncellemeleri Yönet (Atlas OS Güvenli)\n"
+        "[3] Temayı Değiştir\n"
         "[4] GUI (Arayüz) Moduna Geç\n"
         "[5] Çıkış", 
         title="Ana Menü", border_style="bright_blue"
@@ -265,14 +348,12 @@ def run_cli():
         if choice == "1":
             console.print("\n[yellow]Sistem Analiz Ediliyor...[/yellow]")
             files, total_size = core.scan_system()
-            size_str = get_size_format(total_size)
-            
-            if len(files) == 0:
-                console.print("[yellow]Temizlenecek dosya bulunamadı veya yetki yok.[/yellow]")
+            if not files:
+                console.print("[yellow]Temizlenecek dosya yok.[/yellow]")
                 Prompt.ask("\nDevam etmek için Enter...")
                 continue
 
-            console.print(f"Hedeflenen Dosya Sayısı: [cyan]{len(files)}[/cyan] | Beklenen Kazanç: [green]{size_str}[/green]")
+            console.print(f"Hedeflenen Dosya Sayısı: [cyan]{len(files)}[/cyan] | Kazanç: [green]{get_size_format(total_size)}[/green]")
             if Prompt.ask("Temizliğe başlansın mı?", choices=["e", "h"], default="e") == "e":
                 success, fail = 0, 0
                 with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TaskProgressColumn(), console=console) as progress:
@@ -284,31 +365,32 @@ def run_cli():
                             success += 1
                         except: fail += 1
                         progress.update(task, advance=1)
-                        time.sleep(0.002) # Efekt için
-                
-                console.print(f"\n[bold green]✅ Temizlik Tamamlandı![/bold green]")
-                console.print(f"Silinen: {success} | Atlanan: {fail} | Kazanılan Alan: {size_str}")
+                console.print(f"\n[bold green]✅ Temizlik Tamamlandı![/bold green] Silinen: {success} | Atlanan: {fail}")
             Prompt.ask("\nDevam etmek için Enter...")
 
         elif choice == "2":
-            console.print("\n[bold]Hangi ayarı değiştirmek istersiniz?[/bold]")
-            keys = list(core.targets.keys())
-            for i, k in enumerate(keys, 1):
-                durum = "Açık" if core.targets[k]["active"] else "Kapalı"
-                console.print(f"[{i}] {k} (Şu an: {durum})")
-            
-            c = Prompt.ask("Seçim (İptal için Enter)", default="")
-            if c.isdigit() and 1 <= int(c) <= len(keys):
-                selected_key = keys[int(c)-1]
-                core.targets[selected_key]["active"] = not core.targets[selected_key]["active"]
-                console.print(f"[green]{selected_key} durumu değiştirildi.[/green]")
-                time.sleep(1)
+            console.print("\n[bold yellow]Atlas OS Modu: Windows güncellemeleri atlanıyor. Paketler (Winget) aranıyor...[/bold yellow]")
+            output = core.check_updates()
+            console.print(Panel(output, title="Bulunan Güncellemeler"))
+            if "winget" in output.lower() or "hata" in output.lower():
+                pass # Winget yok veya hata var
+            else:
+                if Prompt.ask("Tümünü kurmak ister misiniz?", choices=["e", "h"], default="h") == "e":
+                    console.print("[yellow]Arka planda güncelleniyor, lütfen bekleyin...[/yellow]")
+                    core.install_updates()
+                    console.print("[green]İşlem komutu gönderildi![/green]")
+            Prompt.ask("\nDevam etmek için Enter...")
 
         elif choice == "3":
-            res = core.run_defrag_logic()
-            if res == "ADMIN_REQUIRED":
-                console.print("[yellow]Uyarı: Defrag için UAC onayı bekleniyor...[/yellow]")
-                ctypes.windll.shell32.ShellExecuteW(None, "runas", "dfrgui.exe", "", None, 1)
+            console.print("\n[bold]Hangi temayı seçmek istersiniz? (GUI için)[/bold]")
+            keys = list(THEMES.keys())
+            for i, k in enumerate(keys, 1):
+                console.print(f"[{i}] {k}")
+            c = Prompt.ask("Seçim", choices=[str(i) for i in range(1, len(keys)+1)])
+            selected = keys[int(c)-1]
+            save_config(selected)
+            current_config["theme"] = selected
+            console.print(f"[green]Tema '{selected}' olarak güncellendi![/green]")
             Prompt.ask("\nDevam etmek için Enter...")
 
         elif choice == "4":
@@ -319,10 +401,8 @@ def run_cli():
             break
 
         elif choice == "5":
-            console.print("[bold red]Çıkış yapılıyor...[/bold red]")
             break
 
-# --- ANA GİRİŞ NOKTASI ---
 if __name__ == "__main__":
     if "--gui" in sys.argv:
         app = CleanerGUI()
