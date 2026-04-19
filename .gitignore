@@ -1,0 +1,43 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Nuitka Derleme Dosyaları ---
+# Nuitka'nın derleme sırasında oluşturduğu C kodları ve geçici dosyalar
+*.build/
+*.dist/
+*.onefile-build/
+
+# Senin .bat dosyasında belirttiğin çıktı klasörü
+derlenmis_program/
+
+# --- IDE & OS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+desktop.ini
+nuitka-crash-report.xml
+nuitka-crash-report
+# --- Proje Özel ---
+cleaner_settings.json
+cleaner_pro_config.json
+*.log

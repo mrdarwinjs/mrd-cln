@@ -1,4 +1,4 @@
-🚀 mrdarwin clean (v0.0.4)
+🚀 mrdarwin clean (v0.0.5)
 
 Windows işletim sistemini temizlemek, hızlandırmak ve optimize etmek için Python ile geliştirilmiş hafif ve güçlü bir sistem düzenleyicidir. Gereksiz sistem yüklerini temizleyerek bilgisayarınızın performansını artırmayı hedefler.
 
