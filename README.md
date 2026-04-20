@@ -1,3 +1,11 @@
+Bu proje **GNU General Public License v3.0 (GPL-3.0)** altında lisanslanmıştır.
+
+- **Özgürlük:** Bu yazılımı kopyalayabilir, dağıtabilir ve değiştirebilirsiniz.
+- **Açık Kaynak Zorunluluğu:** Bu kodun kullanıldığı veya modifiye edildiği tüm projelerin de GPL-3.0 ile açık kaynak olarak paylaşılması **zorunludur**.
+- **Sorumluluk:** Yazılım "olduğu gibi" sunulur, herhangi bir garanti verilmez.
+
+Detaylı bilgi için [LICENSE](LICENSE) dosyasına göz atın.
+
 # 🚀 mrdarwin clean (v0.0.5) - Atlas OS & Pro Edition
 
 Windows işletim sistemini temizlemek, hızlandırmak ve optimize etmek için Python ile geliştirilmiş, **Atlas OS** dostu, hafif ve güçlü bir sistem düzenleyicidir. Geleneksel temizleyicilerin aksine, modern paket yöneticileriyle entegre çalışarak sisteminizi sadece temizlemez, aynı zamanda güncel tutar.
@@ -56,10 +64,3 @@ python -m nuitka --onefile --standalone --windows-disable-console --plugin-enabl
 
 
 
-Bu proje **GNU General Public License v3.0 (GPL-3.0)** altında lisanslanmıştır.
-
-- **Özgürlük:** Bu yazılımı kopyalayabilir, dağıtabilir ve değiştirebilirsiniz.
-- **Açık Kaynak Zorunluluğu:** Bu kodun kullanıldığı veya modifiye edildiği tüm projelerin de GPL-3.0 ile açık kaynak olarak paylaşılması **zorunludur**.
-- **Sorumluluk:** Yazılım "olduğu gibi" sunulur, herhangi bir garanti verilmez.
-
-Detaylı bilgi için [LICENSE](LICENSE) dosyasına göz atın.
