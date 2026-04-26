@@ -28,6 +28,8 @@ var/
 # Senin .bat dosyasında belirttiğin çıktı klasörü
 derlenmis_program/
 
+curbugs.text
+
 # --- IDE & OS ---
 .vscode/
 .idea/
